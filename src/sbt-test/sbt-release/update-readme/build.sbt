@@ -1,22 +1,15 @@
 import sbtrelease.ReleaseStateTransformations._
 
 
+releaseReadmeFile := Some(baseDirectory.value / "README.md")
+
 releaseProcess := Seq(
-  checkSnapshotDependencies,
-  inquireVersions,
-  runClean,
-  runTest,
-  setReleaseVersion,
-  commitReleaseVersion,
-  tagRelease,
   updateReadme,
-  commitReadme,
-  setNextVersion,
-  commitNextVersion
+  commitReadme
 )
 
 TaskKey[Unit]("checkReadme") := {
-  val readmeFile = baseDirectory.value / "README.md"
+  val readmeFile = releaseReadmeFile.value.get
   val content = IO.read(readmeFile)
 
   assert(content ==
