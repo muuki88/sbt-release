@@ -1,11 +1,14 @@
 package sbtrelease
 
 import java.io.Serializable
+import java.nio.file.Path
 
 import sbt._
 import Keys._
 import sbt.complete.DefaultParsers._
 import sbt.complete.Parser
+
+import scala.util.matching.Regex
 
 object ReleasePlugin extends AutoPlugin {
 
@@ -26,6 +29,9 @@ object ReleasePlugin extends AutoPlugin {
 
     val releaseVcs = settingKey[Option[Vcs]]("The VCS to use")
     val releasePublishArtifactsAction = taskKey[Unit]("The action that should be performed to publish artifacts")
+
+    val releaseReadmeFile = settingKey[Option[File]]("The path to the README file")
+    val releaseReadmeVersionRegex = settingKey[Regex]("Regex pattern to find version in the README file")
 
     lazy val ReleaseTransformations = sbtrelease.ReleaseStateTransformations
 
@@ -236,6 +242,10 @@ object ReleasePlugin extends AutoPlugin {
 
     releaseIgnoreUntrackedFiles := false,
 
+    releaseReadmeFile := None,
+
+    releaseReadmeVersionRegex := """\%\s+\"(\d{1,2}\.\d{1,2}\.\d{1,2})\"""".r,
+
     releaseProcess := Seq[ReleaseStep](
       checkSnapshotDependencies,
       inquireVersions,
@@ -243,6 +253,8 @@ object ReleasePlugin extends AutoPlugin {
       runTest,
       setReleaseVersion,
       commitReleaseVersion,
+      updateReadme,
+      commitReadme,
       tagRelease,
       publishArtifacts,
       setNextVersion,

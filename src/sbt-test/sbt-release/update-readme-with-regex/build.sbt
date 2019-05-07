@@ -2,6 +2,7 @@ import scala.io.Source
 import sbtrelease.ReleaseStateTransformations._
 
 releaseReadmeFile := Some(baseDirectory.value / "README.md")
+releaseReadmeVersionRegex := """\d{1,2}\.\d{1,2}\.\d{1,2}""".r
 
 releaseProcess := Seq(
   inquireVersions,
@@ -15,8 +16,6 @@ TaskKey[Unit]("runTest") := {
   val readmeFile = releaseReadmeFile.value.get
   val expected =
     """# Update README test
-      |
-      |Casual version mentioning 0.0.1
       |
       |```scala
       |libraryDependencies += "com.example" %% "test" % "1.0.0"

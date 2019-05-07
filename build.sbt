@@ -66,6 +66,8 @@ releaseProcess := Seq[ReleaseStep](
   releaseStepCommandAndRemaining("^ scripted"),
   setReleaseVersion,
   commitReleaseVersion,
+  updateReadme,
+  commitReadme,
   tagRelease,
   releaseStepCommandAndRemaining("^ publishSigned"),
   releaseStepTask(bintrayRelease in `sbt-release`),

@@ -1,12 +1,20 @@
 package sbtrelease
 
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+
 import sbt._
 import sbt.Keys._
 import sbt.Package.ManifestAttributes
+
 import annotation.tailrec
 import ReleasePlugin.autoImport._
 import ReleaseKeys._
+import sbtrelease.ReleasePlugin.autoImport
 
+import scala.io.Source
+import scala.util.matching.Regex
+import scala.util.matching.Regex.{ Groups, Match }
 import sys.process.ProcessLogger
 
 object ReleaseStateTransformations {
@@ -213,42 +221,54 @@ object ReleaseStateTransformations {
 
   lazy val updateReadme: ReleaseStep = ReleaseStep(updateReadmeStep)
   private def updateReadmeStep(state: State): State = {
+    def replacer(newVersion: String)(m: Regex.Match): String = m match {
+      case Groups(oldVersion) ⇒
+        m.toString().replace(oldVersion, newVersion)
+      case Match(_) ⇒
+        newVersion
+      case _ ⇒
+        m.toString()
+    }
     val extracted = Project.extract(state)
-    val releaseVersion = extracted.get(version)
-    val base = extracted.get(baseDirectory)
-    val readmeFile = base / "README.md"
-
-    val versionRegex = """(\d{1,2}\.\d{1,2}\.\d{1,2})""".r
-    val updatedReadmeContent = versionRegex.replaceAllIn(
-      IO.read(readmeFile),
-      releaseVersion
-    )
-
-    IO.write(readmeFile, updatedReadmeContent)
+    extracted.get(autoImport.releaseReadmeFile) match {
+      case Some(readmeFile) ⇒
+        val releaseVersion = extracted.get(version)
+        val versionRegex   = extracted.get(autoImport.releaseReadmeVersionRegex)
+        val readme         = Source.fromFile(readmeFile).mkString
+        Files.write(
+          readmeFile.toPath,
+          versionRegex.replaceAllIn(readme, replacer(releaseVersion)(_)).getBytes(StandardCharsets.UTF_8)
+        )
+        vcs(state).add()
+      case None ⇒
+    }
     state
   }
 
   lazy val commitReadme: ReleaseStep = ReleaseStep(commitReadmeStep)
   private def commitReadmeStep(state: State): State = {
-    val log = toProcessLogger(state)
-    val base = vcs(state).baseDir
-    val sign = Project.extract(state).get(releaseVcsSign)
-    val readmeFile = base / "README.md"
+    val extracted = Project.extract(state)
+    extracted.get(releaseReadmeFile) match {
+      case Some(readmeFile) ⇒
+        val log = toProcessLogger(state)
+        val base = vcs(state).baseDir
+        val sign = extracted.get(releaseVcsSign)
 
-    val relativePath = IO
-      .relativize(base, readmeFile)
-      .getOrElse(
-        "Version file [%s] is outside of this VCS repository with base directory [%s]!" format (readmeFile, base)
-      )
+        val relativePath = IO
+          .relativize(base, readmeFile)
+          .getOrElse(
+            "Version file [%s] is outside of this VCS repository with base directory [%s]!" format(readmeFile, base)
+          )
 
-    vcs(state).add(relativePath) !! log
-    val vcsAddOutput = (vcs(state).status !!).trim
-    if (vcsAddOutput.isEmpty) {
-      state.log.info("README.md hasn't been changed.")
-    } else {
-      vcs(state).commit("Update release version in readme", sign) ! log
+        vcs(state).add(relativePath) !! log
+        val vcsAddOutput = (vcs(state).status !!).trim
+        if (vcsAddOutput.isEmpty) {
+          state.log.info("README.md hasn't been changed.")
+        } else {
+          vcs(state).commit("Update release version in readme", sign) ! log
+        }
+      case None ⇒
     }
-
     state
   }
 
