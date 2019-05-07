@@ -244,7 +244,7 @@ object ReleasePlugin extends AutoPlugin {
 
     releaseReadmeFile := None,
 
-    releaseReadmeVersionRegex := """(\d{1,2}\.\d{1,2}\.\d{1,2})""".r,
+    releaseReadmeVersionRegex := """\%\s+\"(\d{1,2}\.\d{1,2}\.\d{1,2})\"""".r,
 
     releaseProcess := Seq[ReleaseStep](
       checkSnapshotDependencies,

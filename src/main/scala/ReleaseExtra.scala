@@ -1,12 +1,20 @@
 package sbtrelease
 
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+
 import sbt._
 import sbt.Keys._
 import sbt.Package.ManifestAttributes
+
 import annotation.tailrec
 import ReleasePlugin.autoImport._
 import ReleaseKeys._
+import sbtrelease.ReleasePlugin.autoImport
 
+import scala.io.Source
+import scala.util.matching.Regex
+import scala.util.matching.Regex.{ Groups, Match }
 import sys.process.ProcessLogger
 
 object ReleaseStateTransformations {
@@ -213,16 +221,25 @@ object ReleaseStateTransformations {
 
   lazy val updateReadme: ReleaseStep = ReleaseStep(updateReadmeStep)
   private def updateReadmeStep(state: State): State = {
+    def replacer(newVersion: String)(m: Regex.Match): String = m match {
+      case Groups(oldVersion) ⇒
+        m.toString().replace(oldVersion, newVersion)
+      case Match(_) ⇒
+        newVersion
+      case _ ⇒
+        m.toString()
+    }
     val extracted = Project.extract(state)
-    extracted.get(releaseReadmeFile) match {
+    extracted.get(autoImport.releaseReadmeFile) match {
       case Some(readmeFile) ⇒
         val releaseVersion = extracted.get(version)
-        val versionRegex = extracted.get(releaseReadmeVersionRegex)
-        val updatedReadmeContent = versionRegex.replaceAllIn(
-          IO.read(readmeFile),
-          releaseVersion
+        val versionRegex   = extracted.get(autoImport.releaseReadmeVersionRegex)
+        val readme         = Source.fromFile(readmeFile).mkString
+        Files.write(
+          readmeFile.toPath,
+          versionRegex.replaceAllIn(readme, replacer(releaseVersion)(_)).getBytes(StandardCharsets.UTF_8)
         )
-        IO.write(readmeFile, updatedReadmeContent)
+        vcs(state).add()
       case None ⇒
     }
     state
